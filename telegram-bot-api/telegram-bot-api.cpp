@@ -26,6 +26,7 @@
 #include "td/utils/crypto.h"
 #include "td/utils/ExitGuard.h"
 //#include "td/utils/GitInfo.h"
+#include "td/utils/HttpUrl.h"
 #include "td/utils/logging.h"
 #include "td/utils/MemoryLog.h"
 #include "td/utils/misc.h"
@@ -51,6 +52,35 @@
 #include <tuple>
 
 namespace telegram_bot_api {
+
+static td::Status parse_telegram_http_proxy(td::Slice proxy_url, TelegramHttpProxy &proxy) {
+  if (proxy_url.empty()) {
+    return td::Status::OK();
+  }
+  auto r_url = td::parse_url(proxy_url, td::HttpUrl::Protocol::Http);
+  if (r_url.is_error()) {
+    return td::Status::Error(PSLICE() << "Invalid HTTPS_PROXY: " << r_url.error().message());
+  }
+  auto url = r_url.move_as_ok();
+  if (url.host_.empty()) {
+    return td::Status::Error("Invalid HTTPS_PROXY: empty host");
+  }
+  proxy.enabled_ = true;
+  proxy.server_ = std::move(url.host_);
+  proxy.port_ = url.port_ != 0 ? url.port_ : 80;
+  if (!url.userinfo_.empty()) {
+    td::string username = url.userinfo_;
+    td::string password;
+    auto colon_pos = username.find(':');
+    if (colon_pos != td::string::npos) {
+      password = username.substr(colon_pos + 1);
+      username = username.substr(0, colon_pos);
+    }
+    proxy.username_ = std::move(username);
+    proxy.password_ = std::move(password);
+  }
+  return td::Status::OK();
+}
 
 static std::atomic_flag need_reopen_log;
 
@@ -332,6 +362,20 @@ int main(int argc, char *argv[]) {
     LOG(PLAIN) << argv[0] << ": " << r_non_options.error().message();
     LOG(PLAIN) << options;
     return 1;
+  }
+
+  td::string telegram_proxy_url;
+  if (auto *env_proxy = std::getenv("HTTPS_PROXY"); env_proxy != nullptr && *env_proxy != '\0') {
+    telegram_proxy_url = env_proxy;
+  } else if (auto *env_proxy = std::getenv("https_proxy"); env_proxy != nullptr && *env_proxy != '\0') {
+    telegram_proxy_url = env_proxy;
+  }
+  if (!telegram_proxy_url.empty()) {
+    auto proxy_status = parse_telegram_http_proxy(telegram_proxy_url, parameters->telegram_proxy_);
+    if (proxy_status.is_error()) {
+      LOG(PLAIN) << argv[0] << ": " << proxy_status.error().message();
+      return 1;
+    }
   }
 
   td::CombinedLog log;

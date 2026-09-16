@@ -103,6 +103,14 @@ struct SharedData {
   }
 };
 
+struct TelegramHttpProxy {
+  bool enabled_ = false;
+  td::string server_;
+  td::int32 port_ = 0;
+  td::string username_;
+  td::string password_;
+};
+
 struct ClientParameters {
   td::string working_directory_;
   td::string files_directory_;
@@ -117,6 +125,7 @@ struct ClientParameters {
 
   td::int32 default_max_webhook_connections_ = 0;
   td::IPAddress webhook_proxy_ip_address_;
+  TelegramHttpProxy telegram_proxy_;
 
   double start_time_ = 0;
 

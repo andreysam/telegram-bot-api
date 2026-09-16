@@ -9408,6 +9408,17 @@ void Client::on_update_authorization_state() {
                      td::make_unique<TdOnOkCallback>());
       }
 
+      if (parameters_->telegram_proxy_.enabled_) {
+        send_request(make_object<td_api::addProxy>(
+                         make_object<td_api::proxy>(parameters_->telegram_proxy_.server_,
+                                                    parameters_->telegram_proxy_.port_,
+                                                    make_object<td_api::proxyTypeHttp>(
+                                                        parameters_->telegram_proxy_.username_,
+                                                        parameters_->telegram_proxy_.password_, false)),
+                         true, td::string()),
+                     td::make_unique<TdOnOkCallback>());
+      }
+
       auto request = make_object<td_api::setTdlibParameters>();
       request->use_test_dc_ = is_test_dc_;
       request->database_directory_ = dir_;
